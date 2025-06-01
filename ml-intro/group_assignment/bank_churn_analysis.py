@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
@@ -12,12 +13,6 @@ from sklearn.metrics import (classification_report, confusion_matrix,
                            roc_auc_score, roc_curve, accuracy_score,
                            precision_score, recall_score, f1_score)
 import warnings
-warnings.filterwarnings('ignore')
-
-# 设置中文字体和图形样式
-plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
-plt.rcParams['axes.unicode_minus'] = False
-plt.style.use('seaborn-v0_8')
 
 class BankChurnAnalysis:
     def __init__(self):
@@ -32,9 +27,17 @@ class BankChurnAnalysis:
         """加载数据集"""
         print("正在加载数据集...")
         try:
-            self.train_data = pd.read_excel('group_assignment/BankChurners_train.xlsx')
-            self.val_data = pd.read_excel('group_assignment/BankChurners_validation.xlsx')
-            self.test_data = pd.read_excel('group_assignment/BankChurners_test.xlsx')
+            # 获取脚本文件所在目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # 构建数据文件路径（相对于脚本文件位置）
+            train_path = os.path.join(script_dir, 'BankChurners_train.xlsx')
+            val_path = os.path.join(script_dir, 'BankChurners_validation.xlsx')
+            test_path = os.path.join(script_dir, 'BankChurners_test.xlsx')
+            
+            self.train_data = pd.read_excel(train_path)
+            self.val_data = pd.read_excel(val_path)
+            self.test_data = pd.read_excel(test_path)
             
             print(f"训练集大小: {self.train_data.shape}")
             print(f"验证集大小: {self.val_data.shape}")
@@ -51,9 +54,27 @@ class BankChurnAnalysis:
         print("探索性数据分析")
         print("="*60)
         
+        # 数据结构探索
+        print("\n0. 数据结构探索:")
+        print(f"所有列名 (共{len(self.train_data.columns)}列):")
+        for i, col in enumerate(self.train_data.columns):
+            dtype = self.train_data[col].dtype
+            unique_count = self.train_data[col].nunique()
+            print(f"  {i+1:2d}. {col:<25} | 类型: {str(dtype):<10} | 唯一值数: {unique_count:>3}")
+        
+        # 分析类别型特征
+        categorical_features = ['Gender', 'Education_Level', 'Marital_Status', 'Income_Category', 'Card_Category']
+        print(f"\n指定的类别型特征分析:")
+        for col in categorical_features:
+            if col in self.train_data.columns:
+                unique_vals = sorted(self.train_data[col].unique())
+                print(f"  ✅ {col}: {unique_vals}")
+            else:
+                print(f"  ❌ {col}: 未找到此列")
+        
         # 基本信息
         print("\n1. 数据集基本信息:")
-        print(f"训练集列名: {list(self.train_data.columns)}")
+        print(f"训练集形状: {self.train_data.shape}")
         print(f"数据类型分布:")
         print(self.train_data.dtypes.value_counts())
         
@@ -74,12 +95,18 @@ class BankChurnAnalysis:
         # 数值变量描述统计
         print(f"\n4. 数值变量描述统计:")
         numeric_cols = self.train_data.select_dtypes(include=[np.number]).columns
-        print(self.train_data[numeric_cols].describe())
+        print(f"数值型列数: {len(numeric_cols)}")
+        if len(numeric_cols) > 0:
+            print(self.train_data[numeric_cols].describe())
         
         # 可视化
         self.create_eda_plots()
         
     def create_eda_plots(self):
+        # 设置中文字体支持
+        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+
         """创建探索性数据分析图表"""
         fig, axes = plt.subplots(2, 3, figsize=(18, 12))
         
@@ -130,42 +157,144 @@ class BankChurnAnalysis:
         axes[1,2].set_title('特征相关性热力图')
         
         plt.tight_layout()
-        plt.savefig('group_assignment/eda_analysis.png', dpi=300, bbox_inches='tight')
+        # 获取脚本文件所在目录，保存到当前目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, 'eda_analysis.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
     def prepare_features(self, data, fit_scaler=False):
-        """特征预处理"""
+        """特征预处理 - 处理已存在的虚拟变量"""
         # 复制数据
         df = data.copy()
         
-        # 选择特征列（排除目标变量）
-        feature_cols = [col for col in df.columns if col != 'Attrition_Flag']
+        # 选择特征列（排除目标变量和id）
+        feature_cols = [col for col in df.columns if col not in ['Attrition_Flag', 'id']]
         
-        # 分离数值型和类别型特征
-        numeric_features = df[feature_cols].select_dtypes(include=[np.number]).columns.tolist()
-        categorical_features = df[feature_cols].select_dtypes(include=['object']).columns.tolist()
+        print(f"\n特征预处理信息:")
+        print(f"原始特征数: {len(feature_cols)}")
         
-        # 处理类别变量（如果存在）
-        for col in categorical_features:
-            if col in df.columns:
-                le = LabelEncoder()
-                df[col] = le.fit_transform(df[col].astype(str))
+        # 定义原始的数字化类别特征（需要删除，因为已有虚拟变量）
+        original_categorical = ['Gender', 'Education_Level', 'Marital_Status', 'Income_Category', 'Card_Category']
+        
+        # 明确定义虚拟变量组（基于实际数据结构）
+        dummy_groups = {
+            'Gender': ['Gender_F', 'Gender_M'],
+            'Education_Level': [
+                'Education_Level_Unknown', 'Education_Level_Uneducated', 
+                'Education_Level_High_School', 'Education_Level_College',
+                'Education_Level_Graduate', 'Education_Level_Post_Graduate', 
+                'Education_Level_Doctorate'
+            ],
+            'Marital_Status': [
+                'Marital_Status_Unknown', 'Marital_Status_Single',
+                'Marital_Status_Divorced', 'Marital_Status_Married'
+            ],
+            'Income_Category': [
+                'Income_Category_Unknown', 'Income_Category_Less_than_40k',
+                'Income_Category_40k_60k', 'Income_Category_60k_80k',
+                'Income_Category_80k_120k', 'Income_Category_over120k'
+            ],
+            'Card_Category': [
+                'Card_Category_Blue', 'Card_Category_Silver',
+                'Card_Category_Gold', 'Card_Category_Platinum'
+            ]
+        }
+        
+        # 收集所有虚拟变量
+        all_dummy_vars = []
+        for group_vars in dummy_groups.values():
+            all_dummy_vars.extend(group_vars)
+        
+        # 数值型特征（不是原始类别特征，也不是虚拟变量）
+        numeric_features = [col for col in feature_cols 
+                           if col not in original_categorical and col not in all_dummy_vars]
+        
+        print(f"\n特征分类结果:")
+        print(f"  - 原始类别特征(将删除): {original_categorical}")
+        print(f"  - 数值型特征数量: {len(numeric_features)}")
+        print(f"  - 虚拟变量组数量: {len(dummy_groups)}")
+        
+        # 验证虚拟变量是否存在并显示
+        existing_dummy_groups = {}
+        for base_name, group_vars in dummy_groups.items():
+            existing_vars = [col for col in group_vars if col in df.columns]
+            if existing_vars:
+                existing_dummy_groups[base_name] = existing_vars
+                print(f"    {base_name}: {existing_vars} (共{len(existing_vars)}个)")
+            else:
+                print(f"    {base_name}: 未找到虚拟变量")
+        
+        # 处理虚拟变量组，删除一个以避免共线性
+        final_features = numeric_features.copy()
+        removed_features = []
+        
+        for base_name, group_vars in existing_dummy_groups.items():
+            if len(group_vars) > 1:
+                # 删除第一个变量作为参考类别
+                reference_var = group_vars[0]
+                selected_vars = group_vars[1:]
+                removed_features.append(reference_var)
+                
+                print(f"\n处理虚拟变量组 '{base_name}':")
+                print(f"  - 删除参考类别: {reference_var}")
+                print(f"  - 保留变量: {selected_vars}")
+                
+                final_features.extend(selected_vars)
+            else:
+                # 只有一个变量的组，直接保留
+                print(f"\n虚拟变量组 '{base_name}' 只有1个变量，直接保留: {group_vars}")
+                final_features.extend(group_vars)
+        
+        print(f"\n最终特征选择结果:")
+        print(f"  - 数值型特征: {len(numeric_features)}")
+        print(f"  - 保留的虚拟变量: {len(final_features) - len(numeric_features)}")
+        print(f"  - 总特征数: {len(final_features)}")
+        print(f"  - 删除的原始类别特征: {len(original_categorical)}")
+        print(f"  - 删除的参考虚拟变量: {len(removed_features)}")
+        print(f"  - 删除的参考变量: {removed_features}")
         
         # 准备最终特征矩阵
-        X = df[feature_cols]
+        X_processed = df[final_features]
         
-        # 标准化数值特征
-        if fit_scaler:
-            X_scaled = self.scaler.fit_transform(X)
+        print(f"\n数据质量检查:")
+        print(f"  - 最终数据形状: {X_processed.shape}")
+        print(f"  - 数据类型分布: {X_processed.dtypes.value_counts().to_dict()}")
+        
+        # 检查缺失值
+        missing_count = X_processed.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"  - 警告: 发现 {missing_count} 个缺失值，将用0填充")
+            X_processed = X_processed.fillna(0)
         else:
-            X_scaled = self.scaler.transform(X)
+            print(f"  - 无缺失值")
+        
+        # 确保所有特征都是数值型
+        non_numeric_cols = X_processed.select_dtypes(exclude=[np.number]).columns
+        if len(non_numeric_cols) > 0:
+            print(f"  - 警告: 非数值型列: {list(non_numeric_cols)}")
+            for col in non_numeric_cols:
+                X_processed[col] = pd.to_numeric(X_processed[col], errors='coerce')
+        
+        # 标准化特征
+        if fit_scaler:
+            print(f"  - 执行 fit_transform (训练集标准化)")
+            X_scaled = self.scaler.fit_transform(X_processed)
+            # 保存特征名称用于后续分析
+            self.feature_names_ = final_features
+            print(f"  - 保存了 {len(self.feature_names_)} 个特征名称")
+        else:
+            print(f"  - 执行 transform (验证/测试集标准化)")
+            X_scaled = self.scaler.transform(X_processed)
+        
+        print(f"  - 标准化后形状: {X_scaled.shape}")
         
         # 获取目标变量（如果存在）
         if 'Attrition_Flag' in df.columns:
             y = df['Attrition_Flag']
-            return X_scaled, y, feature_cols
+            return X_scaled, y, final_features
         else:
-            return X_scaled, None, feature_cols
+            return X_scaled, None, final_features
     
     def train_models(self):
         """训练多个机器学习模型"""
@@ -301,7 +430,10 @@ class BankChurnAnalysis:
                        f'{height:.3f}', ha='center', va='bottom')
         
         plt.tight_layout()
-        plt.savefig('group_assignment/model_comparison.png', dpi=300, bbox_inches='tight')
+        # 获取脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, 'model_comparison.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
     def plot_roc_curves(self):
@@ -337,7 +469,10 @@ class BankChurnAnalysis:
         plt.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('group_assignment/roc_curves.png', dpi=300, bbox_inches='tight')
+        # 获取脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, 'roc_curves.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
     def evaluate_best_model(self, best_model_name):
@@ -393,7 +528,10 @@ class BankChurnAnalysis:
         plt.ylabel('实际结果')
         
         plt.tight_layout()
-        plt.savefig(f'group_assignment/confusion_matrix_{model_name}.png', dpi=300, bbox_inches='tight')
+        # 获取脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, f'confusion_matrix_{model_name}.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
     def plot_feature_importance(self, model, model_name):
@@ -408,8 +546,13 @@ class BankChurnAnalysis:
                 print(f"模型 {model_name} 不支持特征重要性分析")
                 return
             
-            # 获取特征名称（简化版）
-            feature_names = [f'Feature_{i}' for i in range(len(importances))]
+            # 获取特征名称
+            if hasattr(self, 'feature_names_') and len(self.feature_names_) == len(importances):
+                feature_names = self.feature_names_
+                print(f"使用真实特征名称 (共{len(feature_names)}个特征)")
+            else:
+                feature_names = [f'Feature_{i}' for i in range(len(importances))]
+                print(f"使用默认特征名称 (共{len(feature_names)}个特征)")
             
             # 排序
             indices = np.argsort(importances)[::-1]
@@ -417,19 +560,40 @@ class BankChurnAnalysis:
             # 选择前20个最重要的特征
             n_features = min(20, len(importances))
             
-            plt.figure(figsize=(12, 8))
-            plt.bar(range(n_features), importances[indices[:n_features]])
+            # 获取Top特征的名称和重要性
+            top_features = [(feature_names[i], importances[i]) for i in indices[:n_features]]
+            
+            print(f"\n{model_name} - 前{n_features}个重要特征:")
+            for i, (name, importance) in enumerate(top_features, 1):
+                print(f"  {i:2d}. {name:<25}: {importance:.4f}")
+            
+            plt.figure(figsize=(14, 8))
+            bars = plt.bar(range(n_features), importances[indices[:n_features]], alpha=0.7)
             plt.title(f'{model_name} - 前{n_features}个重要特征')
             plt.xlabel('特征')
             plt.ylabel('重要性')
-            plt.xticks(range(n_features), [feature_names[i] for i in indices[:n_features]], rotation=45)
+            
+            # 设置x轴标签，旋转以避免重叠
+            feature_labels = [feature_names[i] for i in indices[:n_features]]
+            plt.xticks(range(n_features), feature_labels, rotation=45, ha='right')
+            
+            # 添加数值标签
+            for i, bar in enumerate(bars):
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                        f'{height:.3f}', ha='center', va='bottom', fontsize=8)
             
             plt.tight_layout()
-            plt.savefig(f'group_assignment/feature_importance_{model_name}.png', dpi=300, bbox_inches='tight')
+            # 获取脚本文件所在目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            save_path = os.path.join(script_dir, f'feature_importance_{model_name}.png')
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
             plt.show()
             
         except Exception as e:
             print(f"绘制特征重要性时出错: {e}")
+            import traceback
+            traceback.print_exc()
     
     def generate_business_insights(self, best_model_name, test_metrics):
         """生成商业洞察和建议"""
@@ -484,10 +648,14 @@ class BankChurnAnalysis:
         }
         
         import json
-        with open('group_assignment/results_summary.json', 'w', encoding='utf-8') as f:
+        # 获取脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, 'results_summary.json')
+        
+        with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(results_summary, f, ensure_ascii=False, indent=2, default=str)
         
-        print(f"\n结果摘要已保存到: group_assignment/results_summary.json")
+        print(f"\n结果摘要已保存到: {save_path}")
     
     def run_complete_analysis(self):
         """运行完整分析流程"""

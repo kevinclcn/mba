@@ -1,19 +1,19 @@
 {
-  "best_model": "AdaBoost",
+  "best_model": "Random_Forest",
   "test_metrics": {
-    "accuracy": 0.9583500200240288,
-    "precision": 0.884020618556701,
-    "recall": 0.8532338308457711,
-    "f1": 0.8683544303797468,
-    "auc": 0.9849974471318823
+    "accuracy": 0.9523428113736484,
+    "precision": 0.9077809798270894,
+    "recall": 0.7835820895522388,
+    "f1": 0.8411214953271028,
+    "auc": 0.9872421900046308
   },
   "all_model_results": {
     "Logistic_Regression": {
-      "accuracy": 0.9086904285142171,
-      "precision": 0.7570977917981072,
-      "recall": 0.6138107416879796,
-      "f1": 0.6779661016949152,
-      "auc": 0.9328699149671018,
+      "accuracy": 0.9090909090909091,
+      "precision": 0.7628205128205128,
+      "recall": 0.6086956521739131,
+      "f1": 0.6770981507823614,
+      "auc": 0.9328431979753378,
       "best_params": {
         "C": 1,
         "penalty": "l1",
@@ -32,57 +32,57 @@
       }
     },
     "Random_Forest": {
-      "accuracy": 0.9507408890668803,
-      "precision": 0.9161490683229814,
-      "recall": 0.7544757033248082,
-      "f1": 0.8274894810659187,
-      "auc": 0.9842770503469567,
+      "accuracy": 0.9535442531037245,
+      "precision": 0.9256965944272446,
+      "recall": 0.7647058823529411,
+      "f1": 0.8375350140056023,
+      "auc": 0.986270502255157,
       "best_params": {
-        "max_depth": 15,
-        "min_samples_split": 5
+        "max_depth": null,
+        "min_samples_split": 2
       }
     },
     "AdaBoost": {
-      "accuracy": 0.959951942330797,
-      "precision": 0.8921832884097035,
-      "recall": 0.8465473145780051,
-      "f1": 0.868766404199475,
-      "auc": 0.9850603439691249,
+      "accuracy": 0.9567480977172607,
+      "precision": 0.885558583106267,
+      "recall": 0.8312020460358056,
+      "f1": 0.8575197889182058,
+      "auc": 0.985883713078939,
       "best_params": {
         "learning_rate": 1.5,
         "n_estimators": 200
       }
     },
     "Neural_Network_1Layer": {
-      "accuracy": 0.9331197436924309,
-      "precision": 0.7947368421052632,
-      "recall": 0.7723785166240409,
-      "f1": 0.7833981841763943,
-      "auc": 0.9621055904090857,
+      "accuracy": 0.9279134961954345,
+      "precision": 0.7813333333333333,
+      "recall": 0.7493606138107417,
+      "f1": 0.7650130548302873,
+      "auc": 0.9646594919399692,
       "best_params": {
         "alpha": 0.1,
         "learning_rate_init": 0.001
       }
     },
     "Neural_Network_2Layer": {
-      "accuracy": 0.920704845814978,
-      "precision": 0.7292161520190024,
-      "recall": 0.7851662404092071,
-      "f1": 0.7561576354679803,
-      "auc": 0.9598905089101168,
+      "accuracy": 0.9323187825390469,
+      "precision": 0.7488789237668162,
+      "recall": 0.8542199488491049,
+      "f1": 0.7980884109916367,
+      "auc": 0.9677865943850599,
       "best_params": {
         "alpha": 0.01,
         "learning_rate_init": 0.01
       }
     },
     "Neural_Network_3Layer": {
-      "accuracy": 0.9239086904285142,
-      "precision": 0.773841961852861,
-      "recall": 0.7263427109974424,
-      "f1": 0.7493403693931399,
-      "auc": 0.9646388469917881,
+      "accuracy": 0.9279134961954345,
+      "precision": 0.7592137592137592,
+      "recall": 0.7902813299232737,
+      "f1": 0.7744360902255639,
+      "auc": 0.9619319299626206,
       "best_params": {
-        "alpha": 0.1,
+        "alpha": 0.01,
         "learning_rate_init": 0.01
       }
     }
@@ -125,13 +125,13 @@
       "ccp_alpha": 0.0,
       "class_weight": null,
       "criterion": "gini",
-      "max_depth": 15,
+      "max_depth": null,
       "max_features": "sqrt",
       "max_leaf_nodes": null,
       "max_samples": null,
       "min_impurity_decrease": 0.0,
       "min_samples_leaf": 1,
-      "min_samples_split": 5,
+      "min_samples_split": 2,
       "min_weight_fraction_leaf": 0.0,
       "monotonic_cst": null,
       "n_estimators": 100,
@@ -205,7 +205,7 @@
     },
     "Neural_Network_3Layer": {
       "activation": "relu",
-      "alpha": 0.1,
+      "alpha": 0.01,
       "batch_size": "auto",
       "beta_1": 0.9,
       "beta_2": 0.999,
