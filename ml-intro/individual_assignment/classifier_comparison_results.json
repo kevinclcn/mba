@@ -1,0 +1,19 @@
+{
+  "classifier1_metrics": {
+    "AUC": 0.8584140772493218,
+    "Average_Precision": 0.8404948989294845,
+    "Log_Loss": 0.44461770700577785,
+    "Brier_Score": 0.13996751475382407
+  },
+  "classifier2_metrics": {
+    "AUC": 0.8509607926965378,
+    "Average_Precision": 0.8000284015495089,
+    "Log_Loss": 0.44445614070570993,
+    "Brier_Score": 0.14260287184847037
+  },
+  "comparison": {
+    "overall_winner": "分类器1",
+    "classifier1_wins": 3,
+    "classifier2_wins": 1
+  }
+}
