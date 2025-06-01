@@ -381,7 +381,7 @@ class BankChurnAnalysis:
             print(f"验证集AUC: {metrics['auc']:.4f}")
             print(f"验证集准确率: {metrics['accuracy']:.4f}")
     
-    def compare_models(self):
+    def compare_models(self, top_n=2):
         """比较模型性能"""
         print("\n" + "="*60)
         print("模型性能比较")
@@ -395,15 +395,18 @@ class BankChurnAnalysis:
         print("\n模型性能对比表:")
         print(comparison_df)
         
-        # 找出最佳模型
-        best_model_name = comparison_df['auc'].idxmax()
-        print(f"\n最佳模型: {best_model_name}")
-        print(f"最佳AUC: {comparison_df.loc[best_model_name, 'auc']:.4f}")
+        # 按AUC排序，获取前top_n个模型
+        top_models = comparison_df['auc'].nlargest(top_n)
+        top_model_names = top_models.index.tolist()
+        
+        print(f"\n前{top_n}个最佳模型:")
+        for i, (model_name, auc_score) in enumerate(top_models.items(), 1):
+            print(f"  {i}. {model_name}: AUC = {auc_score:.4f}")
         
         # 可视化模型比较
         self.plot_model_comparison(comparison_df)
         
-        return best_model_name
+        return top_model_names
     
     def plot_model_comparison(self, comparison_df):
         """绘制模型性能比较图"""
@@ -672,18 +675,136 @@ class BankChurnAnalysis:
         self.train_models()
         
         # 4. 比较模型
-        best_model_name = self.compare_models()
+        top_model_names = self.compare_models(top_n=2)  # 获取前2个最佳模型
         
         # 5. 绘制ROC曲线
         self.plot_roc_curves()
         
-        # 6. 测试集评估
-        test_metrics = self.evaluate_best_model(best_model_name)
+        # 6. 测试集评估前2个最佳模型
+        all_test_metrics = self.evaluate_top_models(top_model_names)
         
-        # 7. 商业洞察
-        self.generate_business_insights(best_model_name, test_metrics)
+        # 7. 商业洞察（基于最佳模型）
+        best_model_name = top_model_names[0]  # 最佳模型
+        best_test_metrics = all_test_metrics[best_model_name]
+        self.generate_business_insights(best_model_name, best_test_metrics)
         
         print("\n分析完成！所有结果已保存到 group_assignment/ 文件夹")
+
+    def evaluate_top_models(self, top_model_names):
+        """在测试集上评估多个最佳模型"""
+        print("\n" + "="*60)
+        print(f"前{len(top_model_names)}个最佳模型测试集评估")
+        print("="*60)
+        
+        all_test_metrics = {}
+        
+        for i, model_name in enumerate(top_model_names, 1):
+            print(f"\n{'='*20} 模型 {i}: {model_name} {'='*20}")
+            
+            # 准备测试数据
+            X_test, y_test, _ = self.prepare_features(self.test_data, fit_scaler=False)
+            
+            # 获取模型
+            model = self.models[model_name]
+            
+            # 预测
+            y_pred = model.predict(X_test)
+            y_pred_proba = model.predict_proba(X_test)[:, 1]
+            
+            # 性能指标
+            test_metrics = {
+                'accuracy': accuracy_score(y_test, y_pred),
+                'precision': precision_score(y_test, y_pred),
+                'recall': recall_score(y_test, y_pred),
+                'f1': f1_score(y_test, y_pred),
+                'auc': roc_auc_score(y_test, y_pred_proba)
+            }
+            
+            all_test_metrics[model_name] = test_metrics
+            
+            print(f"\n{model_name} 测试集性能指标:")
+            for metric, value in test_metrics.items():
+                print(f"  {metric.upper()}: {value:.4f}")
+            
+            print(f"\n{model_name} 详细分类报告:")
+            print(classification_report(y_test, y_pred, target_names=['未流失', '流失']))
+            
+            # 混淆矩阵
+            self.plot_confusion_matrix(y_test, y_pred, model_name)
+            
+            # 特征重要性（如果模型支持）
+            self.plot_feature_importance(model, model_name)
+        
+        # 创建性能对比表
+        self.compare_test_performance(all_test_metrics)
+        
+        return all_test_metrics
+    
+    def compare_test_performance(self, all_test_metrics):
+        """比较多个模型的测试集性能"""
+        print("\n" + "="*50)
+        print("测试集性能对比")
+        print("="*50)
+        
+        # 创建对比DataFrame
+        comparison_df = pd.DataFrame(all_test_metrics).T
+        comparison_df = comparison_df.round(4)
+        
+        print("\n测试集性能对比表:")
+        print(comparison_df)
+        
+        # 找出各项指标的最佳模型
+        print("\n各指标最佳模型:")
+        for metric in comparison_df.columns:
+            best_model = comparison_df[metric].idxmax()
+            best_score = comparison_df.loc[best_model, metric]
+            print(f"  {metric.upper()}: {best_model} ({best_score:.4f})")
+        
+        # 可视化性能对比
+        self.plot_test_performance_comparison(comparison_df)
+
+    def plot_test_performance_comparison(self, comparison_df):
+        """绘制测试集性能对比图"""
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        
+        metrics = ['accuracy', 'precision', 'recall', 'f1', 'auc']
+        titles = ['准确率', '精确率', '召回率', 'F1分数', 'AUC']
+        colors = ['skyblue', 'lightcoral', 'lightgreen', 'gold', 'plum']
+        
+        for i, (metric, title, color) in enumerate(zip(metrics, titles, colors)):
+            if i < 5:  # 只绘制前5个指标
+                ax = axes[i//3, i%3] if i < 3 else axes[1, i-3]
+                
+                values = comparison_df[metric].values
+                models = comparison_df.index
+                
+                bars = ax.bar(range(len(models)), values, alpha=0.8, color=color)
+                ax.set_title(f'测试集{title}对比', fontsize=14, fontweight='bold')
+                ax.set_ylabel(title, fontsize=12)
+                ax.set_xticks(range(len(models)))
+                ax.set_xticklabels(models, rotation=45, ha='right', fontsize=10)
+                
+                # 添加数值标签
+                for j, bar in enumerate(bars):
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height + 0.005,
+                           f'{height:.3f}', ha='center', va='bottom', fontsize=10)
+                
+                # 高亮最佳模型
+                best_idx = comparison_df[metric].idxmax()
+                best_pos = list(comparison_df.index).index(best_idx)
+                bars[best_pos].set_color('red')
+                bars[best_pos].set_alpha(1.0)
+        
+        # 删除最后一个空的子图
+        axes[1, 2].remove()
+        
+        plt.tight_layout()
+        # 获取脚本文件所在目录
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        save_path = os.path.join(script_dir, 'test_performance_comparison.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
 
 def main():
     """主函数"""
